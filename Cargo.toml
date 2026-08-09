@@ -27,3 +27,36 @@ futures = "0.3"
 strip = true
 lto = true
 opt-level = "z"
+
+# --- cargo-binstall: fetch prebuilt binaries from GitHub Releases -----------
+# Lets users run `cargo binstall netchecker` and get the release archives our
+# CI already uploads, instead of compiling. The URL mirrors the archive naming
+# in .github/workflows/release.yml (taiki-e/upload-rust-binary-action).
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-v{ version }-{ target }{ archive-suffix }"
+pkg-fmt = "tgz"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
+
+[package.metadata.binstall.overrides.aarch64-pc-windows-msvc]
+pkg-fmt = "zip"
+
+# --- cargo-deb: build a .deb from this crate --------------------------------
+# `cargo deb` reads this to produce a Debian package. The release workflow
+# builds one per architecture and attaches it to the GitHub Release.
+[package.metadata.deb]
+maintainer = "Amir Pourmand <pourmand1376@gmail.com>"
+copyright = "2026, Amir Pourmand"
+license-file = ["LICENSE", "0"]
+extended-description = """\
+netchecker probes local infrastructure, DNS, and a curated set of \
+domestic/global/filtered websites in parallel, reporting PASS/FAIL/INFO \
+with timings. Direct mode tests the raw ISP path; proxy mode routes through \
+the system proxy."""
+section = "utils"
+priority = "optional"
+assets = [
+    ["target/release/netchecker", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/netchecker/README.md", "644"],
+]

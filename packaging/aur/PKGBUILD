@@ -1,0 +1,33 @@
+# Maintainer: Amir Pourmand <pourmand1376@gmail.com>
+#
+# AUR package for the prebuilt netchecker binary (from GitHub Releases).
+# Uses the static musl builds so there's no glibc version dependency.
+#
+# To publish a new version:
+#   1. bump pkgver below to match the release tag (without the leading v)
+#   2. run `updpkgsums` to fill in the real sha256sums
+#   3. run `makepkg --printsrcinfo > .SRCINFO`
+#   4. commit PKGBUILD + .SRCINFO and push to the AUR git remote
+
+pkgname=netchecker-bin
+_pkgname=netchecker
+pkgver=0.4.0
+pkgrel=1
+pkgdesc="Cross-platform internet reachability checker (prebuilt binary)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/pourmand1376/netchecker"
+license=('MIT')
+provides=('netchecker')
+conflicts=('netchecker')
+
+source_x86_64=("$_pkgname-$pkgver-x86_64.tar.gz::$url/releases/download/v$pkgver/$_pkgname-v$pkgver-x86_64-unknown-linux-musl.tar.gz")
+source_aarch64=("$_pkgname-$pkgver-aarch64.tar.gz::$url/releases/download/v$pkgver/$_pkgname-v$pkgver-aarch64-unknown-linux-musl.tar.gz")
+
+# Replace with real hashes via `updpkgsums`. SKIP works but is unverified.
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+
+package() {
+    install -Dm755 "$srcdir/$_pkgname" "$pkgdir/usr/bin/$_pkgname"
+    # LICENSE isn't in the binary archive; fetch-and-install is optional.
+}

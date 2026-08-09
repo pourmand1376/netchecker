@@ -92,3 +92,78 @@ jobs:
         run: cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  # 5. Regenerate the Homebrew formula from the release's own .sha256 files and
+  #    push it to the tap. Runs after upload-assets so the checksums exist.
+  #    Requires a TAP_TOKEN secret: a PAT with contents:write on the
+  #    pourmand1376/homebrew-tap repo (the default GITHUB_TOKEN can't push to
+  #    another repo). Skip this job by not setting the secret.
+  update-homebrew:
+    needs: upload-assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tap
+        uses: actions/checkout@v4
+        with:
+          repository: pourmand1376/homebrew-tap
+          token: ${{ secrets.TAP_TOKEN }}
+      - name: Regenerate formula
+        env:
+          TAG: ${{ github.ref_name }} # vX.Y.Z
+        run: |
+          set -euo pipefail
+          v="${TAG#v}"
+          base="https://github.com/pourmand1376/netchecker/releases/download/${TAG}"
+          sha() { curl -fsSL "$base/netchecker-${TAG}-$1.sha256" | awk '{print $1}'; }
+          mac_arm=$(sha aarch64-apple-darwin)
+          mac_x86=$(sha x86_64-apple-darwin)
+          lin_arm=$(sha aarch64-unknown-linux-musl)
+          lin_x86=$(sha x86_64-unknown-linux-musl)
+          mkdir -p Formula
+          cat > Formula/netchecker.rb <<EOF
+          class Netchecker < Formula
+            desc "Cross-platform internet reachability checker"
+            homepage "https://github.com/pourmand1376/netchecker"
+            version "${v}"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                url "${base}/netchecker-${TAG}-aarch64-apple-darwin.tar.gz"
+                sha256 "${mac_arm}"
+              end
+              on_intel do
+                url "${base}/netchecker-${TAG}-x86_64-apple-darwin.tar.gz"
+                sha256 "${mac_x86}"
+              end
+            end
+
+            on_linux do
+              on_arm do
+                url "${base}/netchecker-${TAG}-aarch64-unknown-linux-musl.tar.gz"
+                sha256 "${lin_arm}"
+              end
+              on_intel do
+                url "${base}/netchecker-${TAG}-x86_64-unknown-linux-musl.tar.gz"
+                sha256 "${lin_x86}"
+              end
+            end
+
+            def install
+              bin.install "netchecker"
+            end
+
+            test do
+              system bin/"netchecker", "--version"
+            end
+          end
+          EOF
+      - name: Commit & push
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/netchecker.rb
+          git commit -m "netchecker ${TAG#v}" || { echo "no change"; exit 0; }
+          git push

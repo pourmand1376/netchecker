@@ -41,7 +41,7 @@ pub async fn check_site(probe: &Probe, internet_ok: bool, proxy: Option<&str>) -
                     probe.label.clone(),
                     false,
                     format!("Invalid proxy URL: {proxy}"),
-                )
+                );
             }
         }
     } else {
@@ -70,7 +70,11 @@ pub async fn check_site(probe: &Probe, internet_ok: bool, proxy: Option<&str>) -
     let ms = start.elapsed().as_millis();
 
     match outcome {
-        Err(_) => Status::new(probe.label.clone(), false, format!("Timed out after {ms} ms")),
+        Err(_) => Status::new(
+            probe.label.clone(),
+            false,
+            format!("Timed out after {ms} ms"),
+        ),
         Ok(Err(e)) => {
             let reason = if e.is_connect() {
                 "Connection failed"
@@ -79,11 +83,7 @@ pub async fn check_site(probe: &Probe, internet_ok: bool, proxy: Option<&str>) -
             } else {
                 "Request failed"
             };
-            Status::new(
-                probe.label.clone(),
-                false,
-                format!("{reason} — {ms} ms"),
-            )
+            Status::new(probe.label.clone(), false, format!("{reason} — {ms} ms"))
         }
         Ok(Ok(resp)) => {
             let code = resp.status().as_u16();

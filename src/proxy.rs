@@ -22,18 +22,17 @@ pub fn detect() -> Option<String> {
 
 /// SOCKS takes priority (socks5h keeps DNS on the proxy side), then HTTPS, HTTP.
 fn env_proxy() -> Option<String> {
-    for key in ["ALL_PROXY", "all_proxy"] {
-        if let Ok(v) = std::env::var(key) {
-            if !v.is_empty() {
-                return Some(v);
-            }
-        }
-    }
-    for key in ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"] {
-        if let Ok(v) = std::env::var(key) {
-            if !v.is_empty() {
-                return Some(v);
-            }
+    // ALL_PROXY first (covers every scheme), then the protocol-specific vars.
+    for key in [
+        "ALL_PROXY",
+        "all_proxy",
+        "HTTPS_PROXY",
+        "https_proxy",
+        "HTTP_PROXY",
+        "http_proxy",
+    ] {
+        if let Some(v) = std::env::var(key).ok().filter(|v| !v.is_empty()) {
+            return Some(v);
         }
     }
     None
@@ -60,18 +59,18 @@ fn macos_scutil_proxy() -> Option<String> {
     };
     let enabled = |key: &str| val(key).as_deref() == Some("1");
 
-    if enabled("SOCKSEnable") {
-        if let (Some(h), Some(p)) = (val("SOCKSProxy"), val("SOCKSPort")) {
-            return Some(format!("socks5h://{h}:{p}"));
-        }
+    if let (true, Some(h), Some(p)) = (enabled("SOCKSEnable"), val("SOCKSProxy"), val("SOCKSPort"))
+    {
+        return Some(format!("socks5h://{h}:{p}"));
     }
     // macOS "HTTPS"/"HTTP" proxy entries describe an HTTP CONNECT proxy.
     for prefix in ["HTTPS", "HTTP"] {
-        if enabled(&format!("{prefix}Enable")) {
-            if let (Some(h), Some(p)) = (val(&format!("{prefix}Proxy")), val(&format!("{prefix}Port")))
-            {
-                return Some(format!("http://{h}:{p}"));
-            }
+        if let (true, Some(h), Some(p)) = (
+            enabled(&format!("{prefix}Enable")),
+            val(&format!("{prefix}Proxy")),
+            val(&format!("{prefix}Port")),
+        ) {
+            return Some(format!("http://{h}:{p}"));
         }
     }
     None

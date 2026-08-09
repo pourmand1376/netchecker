@@ -64,10 +64,11 @@ fn macos_ssid(iface: Option<&str>) -> Option<String> {
             let text = String::from_utf8_lossy(&out.stdout);
             for line in text.lines() {
                 let line = line.trim();
-                if let Some(rest) = line.strip_prefix("SSID :") {
-                    if let Some(v) = nonempty(rest.to_string()) {
-                        return Some(v);
-                    }
+                if let Some(v) = line
+                    .strip_prefix("SSID :")
+                    .and_then(|rest| nonempty(rest.to_string()))
+                {
+                    return Some(v);
                 }
             }
         }
@@ -96,10 +97,11 @@ fn linux_ssid() -> Option<String> {
     {
         let text = String::from_utf8_lossy(&out.stdout);
         for line in text.lines() {
-            if let Some(rest) = line.strip_prefix("yes:") {
-                if let Some(v) = nonempty(rest.to_string()) {
-                    return Some(v);
-                }
+            if let Some(v) = line
+                .strip_prefix("yes:")
+                .and_then(|rest| nonempty(rest.to_string()))
+            {
+                return Some(v);
             }
         }
     }
@@ -122,12 +124,14 @@ fn windows_ssid() -> Option<String> {
     for line in text.lines() {
         let line = line.trim();
         // Match "SSID" but not "BSSID".
-        if line.starts_with("SSID") && !line.starts_with("BSSID") {
-            if let Some((_, v)) = line.split_once(':') {
-                if let Some(v) = nonempty(v.to_string()) {
-                    return Some(v);
-                }
-            }
+        if !line.starts_with("SSID") || line.starts_with("BSSID") {
+            continue;
+        }
+        if let Some(v) = line
+            .split_once(':')
+            .and_then(|(_, v)| nonempty(v.to_string()))
+        {
+            return Some(v);
         }
     }
     None

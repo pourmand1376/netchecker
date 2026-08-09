@@ -8,11 +8,16 @@
 //! routable — it answered. Only a *timeout* or "no route" means the host is
 //! actually unreachable. So we treat refused as reachable and only real
 //! timeouts/errors as down.
+//!
+//! We race several ports because a host that's up may silently drop packets on
+//! one port (no RST) while answering on another. A host is reachable if ANY
+//! port connects or refuses; it's only unreachable if every port fails.
 
 use std::io::ErrorKind;
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
 
+use futures::future::join_all;
 use tokio::net::TcpStream;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
@@ -23,35 +28,46 @@ pub struct ReachResult {
     pub ms: u128,
 }
 
-/// Is `ip` reachable? Attempts a TCP connect to `port`; a refusal still counts
-/// as reachable (the host answered). Only a timeout counts as unreachable.
-pub async fn reachable(ip: IpAddr, port: u16) -> ReachResult {
-    let addr = SocketAddr::new(ip, port);
+/// Per-port connect outcome, reduced across the raced ports.
+enum PortOutcome {
+    Up,       // connected or refused — the host answered
+    TimedOut, // no answer within the window
+    Error,    // other error (e.g. no route)
+}
+
+async fn probe_port(addr: SocketAddr) -> PortOutcome {
+    match tokio::time::timeout(CONNECT_TIMEOUT, TcpStream::connect(addr)).await {
+        Ok(Ok(_)) => PortOutcome::Up,
+        Ok(Err(e)) if e.kind() == ErrorKind::ConnectionRefused => PortOutcome::Up,
+        Ok(Err(_)) => PortOutcome::Error,
+        Err(_) => PortOutcome::TimedOut,
+    }
+}
+
+/// Is `ip` reachable? Races TCP connects across `ports`. Reachable if any port
+/// connects or refuses (the host answered); unreachable only if all fail.
+pub async fn reachable(ip: IpAddr, ports: &[u16]) -> ReachResult {
     let start = Instant::now();
-    let outcome = tokio::time::timeout(CONNECT_TIMEOUT, TcpStream::connect(addr)).await;
+    let outcomes = join_all(ports.iter().map(|&p| probe_port(SocketAddr::new(ip, p)))).await;
     let ms = start.elapsed().as_millis();
 
-    match outcome {
-        Ok(Ok(_)) => ReachResult {
+    if outcomes.iter().any(|o| matches!(o, PortOutcome::Up)) {
+        ReachResult {
             ok: true,
             detail: "reachable".into(),
             ms,
-        },
-        // Host answered with a reset — it's up, the port is just closed.
-        Ok(Err(e)) if e.kind() == ErrorKind::ConnectionRefused => ReachResult {
-            ok: true,
-            detail: "reachable (port closed, host answered)".into(),
-            ms,
-        },
-        Ok(Err(e)) => ReachResult {
-            ok: false,
-            detail: format!("unreachable ({})", e.kind()),
-            ms,
-        },
-        Err(_) => ReachResult {
+        }
+    } else if outcomes.iter().all(|o| matches!(o, PortOutcome::TimedOut)) {
+        ReachResult {
             ok: false,
             detail: "unreachable or timed out".into(),
             ms,
-        },
+        }
+    } else {
+        ReachResult {
+            ok: false,
+            detail: "unreachable (no route)".into(),
+            ms,
+        }
     }
 }

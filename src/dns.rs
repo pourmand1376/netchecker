@@ -12,7 +12,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::time::{Duration, Instant};
 
 use hickory_resolver::config::{ResolverConfig, ResolverOpts};
-use hickory_resolver::{system_conf, TokioAsyncResolver};
+use hickory_resolver::{TokioAsyncResolver, system_conf};
 
 const LOOKUP_TIMEOUT: Duration = Duration::from_secs(2);
 

@@ -1,0 +1,70 @@
+name: Release
+
+# Fires when you push a version tag (e.g. `v0.1.1`). `just version-patch` etc.
+# create and push that tag for you.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # needed to create the GitHub Release and upload assets
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # 1. Create the GitHub Release for this tag (once).
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/create-gh-release-action@v1
+        with:
+          # Auto-generate release notes from commits since the last tag.
+          changelog: ""
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 2. Build a binary for every target and attach it (with a SHA-256) to the
+  #    Release. taiki-e installs `cross` automatically for the Linux
+  #    cross/musl targets, so no manual toolchain juggling.
+  upload-assets:
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest } # static
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-latest } # static
+          - { target: x86_64-apple-darwin, os: macos-latest }
+          - { target: aarch64-apple-darwin, os: macos-latest }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest }
+          - { target: aarch64-pc-windows-msvc, os: windows-latest }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: netchecker
+          target: ${{ matrix.target }}
+          # e.g. netchecker-v0.1.1-x86_64-unknown-linux-musl.tar.gz
+          archive: $bin-$tag-$target
+          tar: unix # .tar.gz on unix targets
+          zip: windows # .zip on windows targets
+          checksum: sha256
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # 3. Publish the crate to crates.io. Requires a CARGO_REGISTRY_TOKEN repo
+  #    secret (crates.io API token with publish-update scope).
+  publish-crates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: cargo publish
+        run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

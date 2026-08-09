@@ -22,7 +22,7 @@ use std::time::Instant;
 use clap::Parser;
 use futures::future::join_all;
 
-use ui::{Status, CYAN, GREEN, RED, RESET, YELLOW};
+use ui::{CYAN, GREEN, RED, RESET, Status, YELLOW};
 
 #[derive(Clone, Copy, PartialEq)]
 enum Mode {
@@ -100,18 +100,24 @@ async fn main() {
     let gateway_fut = async {
         match info.gateway {
             Some(gw) => {
-                let r = reach::reachable(IpAddr::V4(gw), 80).await;
+                let r = reach::reachable(IpAddr::V4(gw), &[80, 443, 53]).await;
                 Status::new(
                     format!("Ping Default Gateway ({gw})"),
                     r.ok,
                     format!("{} — {} ms", r.detail, r.ms),
                 )
             }
-            None => Status::new("Ping Default Gateway", false, "No gateway IP found"),
+            // No gateway is normal for a point-to-point tunnel (VPN) egress:
+            // traffic leaves via the tunnel directly, there's no LAN first hop
+            // to ping. Not a failure — internet reachability is checked below.
+            None => Status::info(
+                "Default Gateway",
+                "No LAN gateway (point-to-point/tunnel egress) — see raw IP check below",
+            ),
         }
     };
     let raw_fut = async {
-        let r = reach::reachable(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)), 443).await;
+        let r = reach::reachable(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)), &[443]).await;
         let msg = if r.ok {
             "Global IP routing up"
         } else {
@@ -147,12 +153,15 @@ async fn main() {
     }
 
     let host_list: Vec<String> = hosts.into_iter().collect();
-    let resolved: HashMap<String, (Option<Ipv4Addr>, u128)> =
-        join_all(host_list.iter().map(|h| dns::resolve_timed(&resolver, h.clone())))
-            .await
-            .into_iter()
-            .map(|(host, ip, ms)| (host, (ip, ms)))
-            .collect();
+    let resolved: HashMap<String, (Option<Ipv4Addr>, u128)> = join_all(
+        host_list
+            .iter()
+            .map(|h| dns::resolve_timed(&resolver, h.clone())),
+    )
+    .await
+    .into_iter()
+    .map(|(host, ip, ms)| (host, (ip, ms)))
+    .collect();
 
     // --- DNS Resolution section --------------------------------------------
     println!("\n{YELLOW}[+] DNS Resolution:{RESET}");

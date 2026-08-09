@@ -1,6 +1,6 @@
 [package]
 name = "netchecker"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 description = "Cross-platform internet reachability checker: probes infrastructure, DNS, and a set of domestic/global/filtered sites in parallel"
 license = "MIT"

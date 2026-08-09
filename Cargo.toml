@@ -4,11 +4,20 @@ version = "0.1.0"
 edition = "2021"
 description = "Cross-platform internet reachability checker: probes infrastructure, DNS, and a set of domestic/global/filtered sites in parallel"
 license = "MIT"
-repository = "https://github.com/amirpourmand/netchecker"
+repository = "https://github.com/pourmand1376/netchecker"
 
 [dependencies]
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "socks", "http2"] }
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "macros",
+  "net",
+  "time",
+] }
+reqwest = { version = "0.12", default-features = false, features = [
+  "rustls-tls",
+  "socks",
+  "http2",
+] }
 hickory-resolver = "0.24"
 netdev = "0.31"
 clap = { version = "4", features = ["derive"] }

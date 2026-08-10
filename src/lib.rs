@@ -19,14 +19,13 @@ pub mod ui;
 pub mod wifi;
 
 use std::collections::{HashMap, HashSet};
-use std::io::Write;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Instant;
 
 use clap::Parser;
 use futures::future::join_all;
 
-use ui::{CYAN, GREEN, RED, RESET, Status, YELLOW};
+use ui::{CYAN, RED, RESET, Status, YELLOW};
 
 #[derive(Clone, Copy, PartialEq)]
 enum Mode {
@@ -50,45 +49,40 @@ impl Mode {
     version
 )]
 struct Cli {
-    /// Mode: "direct" (raw ISP) or "proxy" (via system proxy). Prompts if omitted.
+    /// Mode: "direct" (raw ISP) or "proxy" (via system proxy).
+    /// Omit to auto-select: proxy if one is configured, otherwise direct.
     mode: Option<String>,
-    /// Direct mode: bypass proxies and test the raw ISP connection.
+    /// Force direct mode: bypass proxies and test the raw ISP connection.
     #[arg(short, long, conflicts_with = "proxy")]
     direct: bool,
-    /// Proxy mode: route global/filtered sites through the system proxy.
+    /// Force proxy mode: route global/filtered sites through the system proxy.
     #[arg(short, long)]
     proxy: bool,
 }
 
-fn choose_mode(cli: &Cli) -> Mode {
+/// Decide the mode. Explicit flags/arg win; otherwise auto-select based on
+/// whether a system proxy is configured — no interactive prompt.
+fn choose_mode(cli: &Cli, proxy_detected: bool) -> Mode {
     if cli.direct || matches!(cli.mode.as_deref(), Some("direct") | Some("d")) {
         return Mode::Direct;
     }
     if cli.proxy || matches!(cli.mode.as_deref(), Some("proxy") | Some("p")) {
         return Mode::Proxy;
     }
-    // No explicit choice: prompt (default to proxy on EOF / non-interactive).
-    println!("{CYAN}Select Network Check Mode:{RESET}");
-    println!("  {GREEN}[1]{RESET} Proxy Mode (use system proxy for global/filtered sites)");
-    println!("  {YELLOW}[2]{RESET} Direct Mode (bypass proxies and test the raw ISP connection)");
-    print!("Enter choice (1 or 2): ");
-    let _ = std::io::stdout().flush();
-    let mut line = String::new();
-    match std::io::stdin().read_line(&mut line) {
-        Ok(_) if line.trim() == "2" => Mode::Direct,
-        _ => Mode::Proxy,
+    if proxy_detected {
+        Mode::Proxy
+    } else {
+        Mode::Direct
     }
 }
 
 /// Run the full check: parse args, probe everything in parallel, print results.
 pub async fn run() {
     let cli = Cli::parse();
-    let mode = choose_mode(&cli);
-    let proxy: Option<String> = if mode == Mode::Proxy {
-        proxy::detect()
-    } else {
-        None
-    };
+    // Detect the system proxy up front so the mode can auto-select from it.
+    let detected = proxy::detect();
+    let mode = choose_mode(&cli, detected.is_some());
+    let proxy: Option<String> = if mode == Mode::Proxy { detected } else { None };
 
     let info = sysinfo::gather();
     let resolver = dns::build();

@@ -794,7 +794,7 @@ dependencies = [
 
 [[package]]
 name = "netchecker"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "clap",
  "futures",

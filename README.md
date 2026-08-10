@@ -31,13 +31,23 @@ useful behind a VPN/proxy, where the answer differs per route.
 
 ## Install
 
+The recommended way is [`cargo binstall`](https://github.com/cargo-bins/cargo-binstall),
+which downloads a prebuilt binary from the GitHub Releases — no compiling:
+
+```sh
+cargo binstall netchecker
+```
+
+Don't have it yet? `cargo install cargo-binstall` (or grab it from its releases page).
+
+Other options:
+
 ```sh
 # Homebrew (macOS / Linux)
 brew install pourmand1376/tap/netchecker
 
-# Cargo (compile, or `binstall` for a prebuilt binary)
+# Cargo (compile from source)
 cargo install netchecker
-cargo binstall netchecker
 
 # Nix
 nix run github:pourmand1376/netchecker

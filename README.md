@@ -29,13 +29,18 @@ where the answer differs per route.
 
 ## Install
 
-```sh
-cargo binstall netchecker              # prebuilt binary, no compiling (recommended)
-brew install pourmand1376/tap/netchecker
-cargo install netchecker               # compile from source
-nix run github:pourmand1376/netchecker
-sudo apt install ./netchecker_*.deb    # .deb from the Releases page
-```
+Pick whichever fits your setup:
+
+| Method | Command |
+| --- | --- |
+| **Prebuilt binary** (recommended, no compiling) | `cargo binstall netchecker` |
+| Homebrew (macOS/Linux) | `brew install pourmand1376/tap/netchecker` |
+| Nix | `nix run github:pourmand1376/netchecker` |
+| Debian/Ubuntu | download `.deb` from [Releases](../../releases), then `sudo apt install ./netchecker_*.deb` |
+| From source | `cargo install netchecker` |
+
+`cargo binstall` needs [cargo-binstall](https://github.com/cargo-bins/cargo-binstall)
+(`cargo install cargo-binstall`).
 
 ## Usage
 

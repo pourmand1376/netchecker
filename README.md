@@ -1,5 +1,7 @@
 # netchecker
 
+![App-image](app-image.webp)
+
 A fast, cross-platform internet reachability checker. It probes your local
 network infrastructure, DNS, and a set of domestic / global / filtered websites
 **in parallel**, reporting each as `PASS` / `FAIL` / `INFO` with timings — in
